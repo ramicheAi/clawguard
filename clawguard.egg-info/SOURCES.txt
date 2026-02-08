@@ -1,0 +1,11 @@
+README.md
+setup.py
+clawguard/__init__.py
+clawguard/cli.py
+clawguard/scanner.py
+clawguard.egg-info/PKG-INFO
+clawguard.egg-info/SOURCES.txt
+clawguard.egg-info/dependency_links.txt
+clawguard.egg-info/entry_points.txt
+clawguard.egg-info/requires.txt
+clawguard.egg-info/top_level.txt
