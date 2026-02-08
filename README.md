@@ -55,9 +55,11 @@ clawguard report --format html
 ```
 
 ## Pricing
-**Beta Launch Pricing:**
-- $49/month per instance
-- $499 lifetime license (limited time)
+**Launch Pricing (First 100 customers):**
+- **Free**: 10 scans/month (basic security checks)
+- **Pro**: $29/month per instance (unlimited scans + monitoring + alerts)
+- **Lifetime**: $499 one-time payment (unlimited everything, forever)
+- **Team**: Coming soon ($199/month for 5 seats)
 
 ## Roadmap
 - Real-time threat intelligence updates
