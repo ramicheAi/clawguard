@@ -9,7 +9,7 @@ from pathlib import Path
 from .scanner import scan_openclaw, monitor_openclaw, audit_skill, generate_report
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version="1.0.0")
 def cli():
     """ClawGuard - OpenClaw Security Scanner"""
     pass

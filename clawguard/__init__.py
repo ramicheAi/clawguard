@@ -1,7 +1,8 @@
 """
-ClawGuard - OpenClaw Security Scanner
+ClawGuard Pro — OpenClaw Security Scanner
+12 security domains • Actionable remediation
 """
 
-__version__ = "0.1.0"
-__author__ = "Ramiche Security"
-__email__ = "security@ramiche.com"
+__version__ = "1.0.0"
+__author__ = "Parallax Ventures"
+__email__ = "security@parallaxventures.com"

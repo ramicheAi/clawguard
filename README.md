@@ -54,12 +54,42 @@ clawguard audit-skill https://clawhub.com/skill/suspicious-skill
 clawguard report --format html
 ```
 
-## Pricing
-**Launch Pricing (First 100 customers):**
-- **Free**: 10 scans/month (basic security checks)
-- **Pro**: $29/month per instance (unlimited scans + monitoring + alerts)
-- **Lifetime**: $499 one-time payment (unlimited everything, forever)
-- **Team**: Coming soon ($199/month for 5 seats)
+## 🚀 Get ClawGuard Now
+
+### Free Tier
+**10 scans/month** - Basic security checks
+```bash
+# Install and start scanning
+git clone https://github.com/ramicheAi/clawguard.git
+cd clawguard
+pip install -r requirements.txt
+python3 -m clawguard.cli scan
+```
+
+### Pro Tier - **$29/month**
+**Unlimited everything** - Professional security for your OpenClaw agents
+- ✅ Unlimited security scans
+- ✅ Real-time monitoring daemon
+- ✅ Slack/Discord alerts
+- ✅ Priority support
+- ✅ Early access to new features
+
+**[👉 Get ClawGuard Pro - $29/month](YOUR_GUMROAD_MONTHLY_LINK_HERE)**
+
+### Lifetime Deal - **$499** (First 100 customers only)
+**Pay once, use forever** - Never worry about security again
+- ✅ All Pro features, forever
+- ✅ Free updates for life
+- ✅ Team features when released
+- ✅ Dedicated support channel
+
+**[👉 Get ClawGuard Lifetime - $499](YOUR_GUMROAD_LIFETIME_LINK_HERE)**
+
+### Need a team license?
+**Team Plan - $199/month** (5 seats) coming soon
+- [Join waitlist](mailto:team@clawguard.ai?subject=Team%20Plan%20Waitlist)
+
+*All payments processed securely via Gumroad/Stripe. 30-day money-back guarantee.*
 
 ## Roadmap
 - Real-time threat intelligence updates
