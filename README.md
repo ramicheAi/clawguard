@@ -1,110 +1,108 @@
-# ClawGuard - OpenClaw Security Scanner
+# ClawGuard Pro — OpenClaw Security Scanner
 
-Automated security scanner for OpenClaw instances. Identifies vulnerabilities, detects malicious skills, validates configurations, and provides real-time monitoring.
-
-## Problem
-OpenClaw users are scared to give AI agents shell access due to:
-- 341+ malicious skills on ClawHub
-- SOUL.md prompt injection attacks
-- CVE-2026-25253 WebSocket token hijacking
-- No runtime defense tools available
-
-## Solution
-ClawGuard provides:
-1. **Vulnerability Scanning** - Detect known CVEs and security flaws
-2. **Skill Auditing** - Check ClawHub skills for malware
-3. **Config Validation** - Validate OpenClaw configuration files
-4. **Real-time Monitoring** - Watch for suspicious tool usage
-5. **Whitelist Enforcement** - Safe execution policies
-
-## Features (MVP)
-- ✅ Scan for CVE-2026-25253 (WebSocket token hijacking)
-- ✅ Detect malicious skills in ClawHub registry
-- ✅ Validate SOUL.md/AGENTS.md for prompt injections
-- ✅ Check file permissions and access controls
-- ✅ Generate security score (0-100)
-- ✅ Provide actionable remediation steps
+Automated security scanner for OpenClaw installations. 12 security domains, actionable remediation, real-time monitoring.
 
 ## Installation
-```bash
-# Quick install
-curl -fsSL https://get.clawguard.ai/install | bash
 
-# Or manual
-git clone https://github.com/ramiche/clawguard.git
+```bash
+# Clone and install
+git clone https://github.com/ramicheAi/clawguard.git
 cd clawguard
-pip install -r requirements.txt
+pip install -e .
+
+# Or install directly
+pip install git+https://github.com/ramicheAi/clawguard.git
 ```
 
 ## Usage
+
 ```bash
-# Basic scan
+# Full security scan
 clawguard scan
 
-# Scan specific OpenClaw instance
+# Scan specific OpenClaw path
 clawguard scan --path ~/.openclaw
 
+# Quick security score
+clawguard score
+
+# JSON output for automation
+clawguard scan --output json
+
 # Continuous monitoring
-clawguard monitor --daemon
-
-# Skill audit
-clawguard audit-skill https://clawhub.com/skill/suspicious-skill
-
-# Generate security report
-clawguard report --format html
+clawguard monitor --daemon --interval 60
 ```
 
-## 🚀 Get ClawGuard Now
+## What It Scans (12 Security Domains)
 
-### Free Tier
-**10 scans/month** - Basic security checks
-```bash
-# Install and start scanning
-git clone https://github.com/ramicheAi/clawguard.git
-cd clawguard
-pip install -r requirements.txt
-python3 -m clawguard.cli scan
+| Domain | What It Checks |
+|--------|---------------|
+| Authentication | Gateway token strength, API key exposure, .env files |
+| Authorization | AGENTS.md permissions, skill tool access, permission bypass |
+| Encryption | HTTPS enforcement, SSH key permissions |
+| Vulnerabilities | Node.js/Python versions, known CVEs |
+| Audit Logging | Log directory existence, logging configuration |
+| Network | Open ports, firewall status, interface binding |
+| Terminal | Secret keys in shell history |
+| Emergency | Backup existence, kill switch configuration |
+| Containers | Docker root user, container security |
+| API Security | CORS configuration, rate limiting |
+| Dependencies | npm audit, unpinned skill dependencies |
+| Disaster Recovery | Backup freshness, git version control |
+
+**Bonus checks:** SOUL.md prompt injection detection, malicious skill scanning, file permission auditing.
+
+## Example Output
+
+```
+============================================================
+  ClawGuard Pro — Security Scan Report
+  2026-02-24T14:30:00
+  Version 1.0.0 • 12 domains scanned
+============================================================
+
+  SECURITY SCORE: 75/100
+
+  Status: GOOD — minor improvements recommended
+
+  ISSUES FOUND (3):
+  --------------------------------------------------------
+
+  1. [HIGH] Weak gateway token
+     Domain: authentication
+     Gateway token is shorter than 32 characters
+     Fix: Regenerate with: openclaw gateway regenerate-token
+
+  2. [MEDIUM] macOS firewall disabled
+     Domain: network
+     Application firewall is not active
+     Fix: Enable: System Settings > Network > Firewall > On
+
+  3. [LOW] Backup older than 7 days
+     Domain: disaster_recovery
+     Most recent backup is 12 days old
+     Fix: Run: openclaw backup create
 ```
 
-### Pro Tier - **$29/month**
-**Unlimited everything** - Professional security for your OpenClaw agents
-- ✅ Unlimited security scans
-- ✅ Real-time monitoring daemon
-- ✅ Slack/Discord alerts
-- ✅ Priority support
-- ✅ Early access to new features
+## Pricing
 
-**[👉 Get ClawGuard Pro - $29/month](YOUR_GUMROAD_MONTHLY_LINK_HERE)**
+| Plan | Price | Includes |
+|------|-------|----------|
+| **Free** | $0 | 10 scans/month, basic security checks |
+| **Pro** | $29/month | Unlimited scans, monitoring daemon, alerts, priority support |
+| **Lifetime** | $499 one-time | All Pro features forever, free updates for life |
 
-### Lifetime Deal - **$499** (First 100 customers only)
-**Pay once, use forever** - Never worry about security again
-- ✅ All Pro features, forever
-- ✅ Free updates for life
-- ✅ Team features when released
-- ✅ Dedicated support channel
+[Get ClawGuard Pro →](https://parallax-site-ashen.vercel.app/clawguard)
 
-**[👉 Get ClawGuard Lifetime - $499](YOUR_GUMROAD_LIFETIME_LINK_HERE)**
+## Requirements
 
-### Need a team license?
-**Team Plan - $199/month** (5 seats) coming soon
-- [Join waitlist](mailto:team@clawguard.ai?subject=Team%20Plan%20Waitlist)
+- Python 3.8+
+- OpenClaw installation
+- macOS or Linux
 
-*All payments processed securely via Gumroad/Stripe. 30-day money-back guarantee.*
+## Built by Parallax Ventures
 
-## Roadmap
-- Real-time threat intelligence updates
-- Automated patching
-- Team dashboard
-- Compliance reporting (SOC2, GDPR)
-- Slack/Discord alerts
+ClawGuard is built by the team behind [OpenClaw](https://github.com/openclaw/openclaw) — the open-source AI agent platform.
 
-## Why ClawGuard?
-- Built by security experts who understand AI agent risks
-- Focused exclusively on OpenClaw ecosystem
-- Zero-configuration scanning
-- Community-driven threat intelligence
-
-## Getting Help
-- Docs: https://docs.clawguard.ai
-- Discord: https://discord.gg/clawguard
-- Email: support@clawguard.ai
+- Website: [parallax-site-ashen.vercel.app/clawguard](https://parallax-site-ashen.vercel.app/clawguard)
+- Support: parallaxventuresinc@gmail.com
