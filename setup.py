@@ -5,9 +5,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="clawguard",
-    version="0.1.0",
-    author="Ramiche Security",
-    author_email="security@ramiche.com",
+    version="1.0.0",
+    author="Parallax Ventures",
+    author_email="parallaxventuresinc@gmail.com",
     description="OpenClaw Security Scanner - Protect your AI agents from vulnerabilities",
     long_description=long_description,
     long_description_content_type="text/markdown",
