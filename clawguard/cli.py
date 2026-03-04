@@ -110,6 +110,42 @@ def score(path):
     
     sys.exit(0 if score >= 70 else 1)
 
+@cli.command()
+@click.option('--path', default='~/.openclaw', help='OpenClaw installation path')
+@click.option('--frameworks', default='soc2,hipaa,gdpr', help='Comma-separated frameworks to check')
+@click.option('--output', type=click.Choice(['json', 'text']), default='text', help='Output format')
+def compliance(path, frameworks, output):
+    """Check compliance readiness (SOC 2, HIPAA, GDPR)"""
+    from .scanner import OpenClawScanner
+    path = Path(path).expanduser()
+    if not path.exists():
+        click.echo(f"Error: OpenClaw path not found: {path}", err=True)
+        sys.exit(1)
+
+    fw_list = [f.strip().lower() for f in frameworks.split(",")]
+    click.echo(f"Checking compliance: {', '.join(f.upper() for f in fw_list)}")
+
+    scanner = OpenClawScanner(str(path))
+    scanner.scan_compliance(fw_list)
+
+    if output == 'json':
+        import json
+        click.echo(json.dumps(scanner.results.get("compliance", {}), indent=2))
+    else:
+        comp = scanner.results.get("compliance", {})
+        for fw_key, fw in comp.items():
+            name = fw.get("framework", fw_key.upper())
+            score_val = fw.get("score", 0)
+            readiness = fw.get("readiness", "Unknown")
+            color = 'green' if score_val >= 80 else 'yellow' if score_val >= 50 else 'red'
+            click.echo(f"\n{name}: {click.style(f'{score_val}%', fg=color, bold=True)} — {readiness}")
+            for ctrl in fw.get("controls", []):
+                icon = "✓" if ctrl["status"] == "pass" else "✗"
+                click.echo(f"  {icon} [{ctrl['id']}] {ctrl['name']}")
+                click.echo(f"    {ctrl['detail']}")
+
+    sys.exit(0)
+
 def main():
     cli()
 

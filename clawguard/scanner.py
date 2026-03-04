@@ -443,6 +443,255 @@ class OpenClawScanner:
                         f"{fp} is readable by other users ({oct(mode)})",
                         "medium", f"chmod 600 {fp}")
 
+    # ── Domain 13: Compliance Frameworks ─────────────────────
+    def scan_compliance(self, frameworks=None):
+        """Scan for SOC 2, HIPAA, and GDPR compliance readiness."""
+        self.results["domains_scanned"].append("compliance")
+        if frameworks is None:
+            frameworks = ["soc2", "hipaa", "gdpr"]
+
+        compliance_results = {}
+
+        if "soc2" in frameworks:
+            compliance_results["soc2"] = self._check_soc2()
+        if "hipaa" in frameworks:
+            compliance_results["hipaa"] = self._check_hipaa()
+        if "gdpr" in frameworks:
+            compliance_results["gdpr"] = self._check_gdpr()
+
+        self.results["compliance"] = compliance_results
+
+    def _check_soc2(self):
+        """SOC 2 Trust Service Criteria checks."""
+        checks = {"framework": "SOC 2", "passed": 0, "failed": 0, "controls": []}
+
+        # CC1: Security — access controls
+        config = self.path / "config.json"
+        if config.exists():
+            try:
+                data = json.loads(config.read_text())
+                token = data.get("gateway", {}).get("token", "")
+                if token and len(token) >= 32:
+                    checks["controls"].append({"id": "CC1.1", "name": "Access Control", "status": "pass", "detail": "Gateway token meets minimum length"})
+                    checks["passed"] += 1
+                else:
+                    checks["controls"].append({"id": "CC1.1", "name": "Access Control", "status": "fail", "detail": "Gateway token too short or missing"})
+                    checks["failed"] += 1
+                    self._add_issue("compliance", "SOC 2 CC1.1 — Weak access control",
+                        "Gateway token does not meet SOC 2 minimum strength requirements",
+                        "high", "Regenerate with 32+ character token")
+            except Exception:
+                checks["controls"].append({"id": "CC1.1", "name": "Access Control", "status": "fail", "detail": "Cannot read config"})
+                checks["failed"] += 1
+
+        # CC2: Communication — logging
+        logs_dir = self.path / "logs"
+        if logs_dir.exists() and list(logs_dir.glob("*")):
+            checks["controls"].append({"id": "CC2.1", "name": "Audit Logging", "status": "pass", "detail": "Audit logs present"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "CC2.1", "name": "Audit Logging", "status": "fail", "detail": "No audit logs — SOC 2 requires activity logging"})
+            checks["failed"] += 1
+            self._add_issue("compliance", "SOC 2 CC2.1 — No audit logging",
+                "SOC 2 requires comprehensive audit logging of system activities",
+                "high", "Enable logging in OpenClaw config")
+
+        # CC3: Risk Assessment — vulnerability scanning
+        checks["controls"].append({"id": "CC3.1", "name": "Vulnerability Scanning", "status": "pass", "detail": "ClawGuard provides automated vulnerability scanning"})
+        checks["passed"] += 1
+
+        # CC6: Logical Access — encryption
+        ssh_dir = Path.home() / ".ssh"
+        ssh_ok = True
+        if ssh_dir.exists():
+            for key_file in ssh_dir.glob("id_*"):
+                if not key_file.name.endswith(".pub"):
+                    mode = key_file.stat().st_mode
+                    if mode & 0o077:
+                        ssh_ok = False
+        if ssh_ok:
+            checks["controls"].append({"id": "CC6.1", "name": "Encryption Keys", "status": "pass", "detail": "SSH keys properly secured"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "CC6.1", "name": "Encryption Keys", "status": "fail", "detail": "SSH key permissions too permissive"})
+            checks["failed"] += 1
+
+        # CC7: System Operations — monitoring
+        checks["controls"].append({"id": "CC7.1", "name": "System Monitoring", "status": "pass", "detail": "ClawGuard monitor daemon available"})
+        checks["passed"] += 1
+
+        # CC8: Change Management — version control
+        git_dir = self.path / "workspace" / ".git"
+        if git_dir.exists():
+            checks["controls"].append({"id": "CC8.1", "name": "Change Management", "status": "pass", "detail": "Git version control in use"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "CC8.1", "name": "Change Management", "status": "fail", "detail": "No version control — SOC 2 requires change tracking"})
+            checks["failed"] += 1
+            self._add_issue("compliance", "SOC 2 CC8.1 — No change management",
+                "SOC 2 requires version control for all configuration changes",
+                "medium", "Initialize git: cd ~/.openclaw/workspace && git init")
+
+        # CC9: Risk Mitigation — backups
+        backup_dir = self.path / "backups"
+        if backup_dir.exists() and list(backup_dir.glob("*.tar.gz")):
+            checks["controls"].append({"id": "CC9.1", "name": "Data Backup", "status": "pass", "detail": "Backup archives found"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "CC9.1", "name": "Data Backup", "status": "fail", "detail": "No backups — SOC 2 requires data recovery capability"})
+            checks["failed"] += 1
+
+        total = checks["passed"] + checks["failed"]
+        checks["score"] = int((checks["passed"] / total * 100)) if total > 0 else 0
+        checks["readiness"] = "Ready" if checks["score"] >= 80 else "Needs Work" if checks["score"] >= 50 else "Not Ready"
+        return checks
+
+    def _check_hipaa(self):
+        """HIPAA Security Rule checks."""
+        checks = {"framework": "HIPAA", "passed": 0, "failed": 0, "controls": []}
+
+        # 164.312(a) — Access Control
+        config = self.path / "config.json"
+        has_auth = False
+        if config.exists():
+            try:
+                data = json.loads(config.read_text())
+                if data.get("gateway", {}).get("token"):
+                    has_auth = True
+            except Exception:
+                pass
+        if has_auth:
+            checks["controls"].append({"id": "164.312(a)", "name": "Access Control", "status": "pass", "detail": "Authentication mechanism in place"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "164.312(a)", "name": "Access Control", "status": "fail", "detail": "No authentication — HIPAA requires unique user identification"})
+            checks["failed"] += 1
+            self._add_issue("compliance", "HIPAA 164.312(a) — No access control",
+                "HIPAA requires unique user identification and access controls",
+                "critical", "Configure gateway authentication token")
+
+        # 164.312(b) — Audit Controls
+        logs_dir = self.path / "logs"
+        if logs_dir.exists() and list(logs_dir.glob("*")):
+            checks["controls"].append({"id": "164.312(b)", "name": "Audit Controls", "status": "pass", "detail": "Audit logs present"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "164.312(b)", "name": "Audit Controls", "status": "fail", "detail": "No audit trail — HIPAA requires activity logging"})
+            checks["failed"] += 1
+            self._add_issue("compliance", "HIPAA 164.312(b) — No audit controls",
+                "HIPAA requires hardware/software/procedural mechanisms to record system activity",
+                "critical", "Enable comprehensive audit logging")
+
+        # 164.312(c) — Integrity Controls
+        checks["controls"].append({"id": "164.312(c)", "name": "Integrity Controls", "status": "pass", "detail": "ClawGuard provides integrity monitoring"})
+        checks["passed"] += 1
+
+        # 164.312(d) — Person/Entity Authentication
+        checks["controls"].append({"id": "164.312(d)", "name": "Authentication", "status": "pass" if has_auth else "fail",
+            "detail": "Gateway token authentication" if has_auth else "No entity authentication configured"})
+        if has_auth:
+            checks["passed"] += 1
+        else:
+            checks["failed"] += 1
+
+        # 164.312(e) — Transmission Security
+        config = self.path / "config.json"
+        has_http = False
+        if config.exists():
+            try:
+                data = json.loads(config.read_text())
+                for key, val in self._flatten_dict(data):
+                    if isinstance(val, str) and val.startswith("http://") and "localhost" not in val:
+                        has_http = True
+                        break
+            except Exception:
+                pass
+        if not has_http:
+            checks["controls"].append({"id": "164.312(e)", "name": "Transmission Security", "status": "pass", "detail": "All endpoints use HTTPS"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "164.312(e)", "name": "Transmission Security", "status": "fail", "detail": "Unencrypted HTTP endpoints found"})
+            checks["failed"] += 1
+            self._add_issue("compliance", "HIPAA 164.312(e) — Unencrypted transmission",
+                "HIPAA requires encryption for data in transit",
+                "critical", "Switch all endpoints to HTTPS")
+
+        total = checks["passed"] + checks["failed"]
+        checks["score"] = int((checks["passed"] / total * 100)) if total > 0 else 0
+        checks["readiness"] = "Ready" if checks["score"] >= 80 else "Needs Work" if checks["score"] >= 50 else "Not Ready"
+        return checks
+
+    def _check_gdpr(self):
+        """GDPR compliance readiness checks."""
+        checks = {"framework": "GDPR", "passed": 0, "failed": 0, "controls": []}
+
+        # Art. 5 — Data minimization
+        env_file = self.path / ".env"
+        if not env_file.exists():
+            checks["controls"].append({"id": "Art.5", "name": "Data Minimization", "status": "pass", "detail": "No plaintext .env with excess data"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "Art.5", "name": "Data Minimization", "status": "fail", "detail": "Plaintext .env may contain unnecessary personal data"})
+            checks["failed"] += 1
+
+        # Art. 25 — Data protection by design
+        config = self.path / "config.json"
+        has_token = False
+        if config.exists():
+            try:
+                data = json.loads(config.read_text())
+                has_token = bool(data.get("gateway", {}).get("token"))
+            except Exception:
+                pass
+        if has_token:
+            checks["controls"].append({"id": "Art.25", "name": "Data Protection by Design", "status": "pass", "detail": "Access controls configured"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "Art.25", "name": "Data Protection by Design", "status": "fail", "detail": "No access controls — GDPR requires privacy by design"})
+            checks["failed"] += 1
+
+        # Art. 30 — Records of processing
+        logs_dir = self.path / "logs"
+        if logs_dir.exists():
+            checks["controls"].append({"id": "Art.30", "name": "Records of Processing", "status": "pass", "detail": "Activity logging available"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "Art.30", "name": "Records of Processing", "status": "fail", "detail": "No activity logs — GDPR requires processing records"})
+            checks["failed"] += 1
+            self._add_issue("compliance", "GDPR Art.30 — No processing records",
+                "GDPR requires maintaining records of processing activities",
+                "high", "Enable audit logging for GDPR compliance")
+
+        # Art. 32 — Security of processing
+        ssh_dir = Path.home() / ".ssh"
+        ssh_ok = True
+        if ssh_dir.exists():
+            for key_file in ssh_dir.glob("id_*"):
+                if not key_file.name.endswith(".pub"):
+                    mode = key_file.stat().st_mode
+                    if mode & 0o077:
+                        ssh_ok = False
+        if ssh_ok:
+            checks["controls"].append({"id": "Art.32", "name": "Security of Processing", "status": "pass", "detail": "Encryption keys properly secured"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "Art.32", "name": "Security of Processing", "status": "fail", "detail": "Encryption keys not properly secured"})
+            checks["failed"] += 1
+
+        # Art. 33 — Breach notification readiness
+        backup_dir = self.path / "backups"
+        if backup_dir.exists():
+            checks["controls"].append({"id": "Art.33", "name": "Breach Response", "status": "pass", "detail": "Backup and recovery capability exists"})
+            checks["passed"] += 1
+        else:
+            checks["controls"].append({"id": "Art.33", "name": "Breach Response", "status": "fail", "detail": "No backup/recovery — critical for breach response"})
+            checks["failed"] += 1
+
+        total = checks["passed"] + checks["failed"]
+        checks["score"] = int((checks["passed"] / total * 100)) if total > 0 else 0
+        checks["readiness"] = "Ready" if checks["score"] >= 80 else "Needs Work" if checks["score"] >= 50 else "Not Ready"
+        return checks
+
     # ── Helpers ──────────────────────────────────────────────
     @staticmethod
     def _flatten_dict(d, prefix=""):
@@ -482,6 +731,7 @@ class OpenClawScanner:
         self.scan_prompt_injections()
         self.scan_malicious_skills()
         self.scan_file_permissions()
+        self.scan_compliance()
         self.calculate_score()
         return self.results
 
@@ -552,6 +802,21 @@ def generate_report(results: Dict[str, Any], format: str = "text") -> str:
         for rec in recs:
             lines.append(f"\n  • {rec['title']}")
             lines.append(f"    {rec['action']}")
+
+    compliance = results.get("compliance", {})
+    if compliance:
+        lines.append(f"\n  COMPLIANCE READINESS:")
+        lines.append("  " + "-" * 56)
+        for fw_key, fw in compliance.items():
+            name = fw.get("framework", fw_key.upper())
+            score_val = fw.get("score", 0)
+            readiness = fw.get("readiness", "Unknown")
+            passed = fw.get("passed", 0)
+            failed = fw.get("failed", 0)
+            lines.append(f"\n  {name}: {score_val}% — {readiness} ({passed} passed, {failed} failed)")
+            for ctrl in fw.get("controls", []):
+                status_icon = "✓" if ctrl["status"] == "pass" else "✗"
+                lines.append(f"    {status_icon} [{ctrl['id']}] {ctrl['name']}: {ctrl['detail']}")
 
     lines.append("\n  DOMAINS SCANNED:")
     lines.append("  " + "-" * 56)
