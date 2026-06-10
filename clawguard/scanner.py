@@ -402,31 +402,36 @@ class OpenClawScanner:
                         "high", "Review and sanitize SOUL.md immediately")
 
     def scan_malicious_skills(self):
+        from . import patterns
         skills_dir = self.path / "workspace" / "skills"
         if not skills_dir.exists():
             return
-        dangerous = [
-            ("atomic-stealer", "Atomic Stealer malware"),
-            ("shell-backdoor", "Shell backdoor"),
-            ("token-stealer", "Token stealer"),
-            ("prompt-injection", "Prompt injection payload"),
-            ("reverse-shell", "Reverse shell"),
-            ("keylogger", "Keylogger"),
-            ("crypto-miner", "Cryptominer"),
-        ]
+        exts = {".md", ".js", ".ts", ".py", ".sh", ".json", ".rb", ".php", ".pl"}
+        skip = {"node_modules", ".git", "__pycache__", "dist", "build"}
         for skill in skills_dir.iterdir():
-            if skill.is_dir():
-                for f in [skill / "SKILL.md", skill / "index.js", skill / "main.py"]:
-                    if f.exists():
-                        try:
-                            content = f.read_text(errors="ignore")
-                            for pattern, desc in dangerous:
-                                if pattern in content.lower():
-                                    self._add_issue("vulnerabilities", f"Malicious skill: {desc}",
-                                        f"Skill '{skill.name}' / {f.name} contains '{pattern}'",
-                                        "critical", f"Remove immediately: rm -rf {skill}")
-                        except Exception:
-                            pass
+            if not skill.is_dir():
+                continue
+            seen = set()  # one issue per (skill, pattern) — avoid flooding
+            for f in skill.rglob("*"):
+                if not f.is_file() or f.suffix not in exts:
+                    continue
+                if any(part in skip for part in f.parts):
+                    continue
+                try:
+                    content = f.read_text(errors="ignore")
+                except Exception:
+                    continue
+                for finding in patterns.scan_text(content):
+                    if finding["id"] in seen:
+                        continue
+                    seen.add(finding["id"])
+                    self._add_issue(
+                        "vulnerabilities",
+                        f"Malicious skill pattern: {finding['description']}",
+                        f"Skill '{skill.name}' / {f.name}: [{finding['category']}] '{finding['match']}'",
+                        finding["severity"],
+                        f"Review and remove if confirmed: {skill}",
+                    )
 
     def scan_file_permissions(self):
         critical = [
@@ -757,7 +762,50 @@ def monitor_openclaw(interval: int = 60, daemon: bool = False) -> Dict[str, Any]
         return scanner.scan()
 
 def audit_skill(skill_url: str) -> Dict[str, Any]:
-    return {"skill_url": skill_url, "status": "coming_soon"}
+    """Audit a ClawHub skill (URL or local path) against the pattern corpus."""
+    import os
+    from . import patterns
+
+    content = ""
+    try:
+        if skill_url.startswith(("http://", "https://")):
+            import urllib.request
+            req = urllib.request.Request(skill_url, headers={"User-Agent": "ClawGuard"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                content = resp.read(2_000_000).decode("utf-8", "ignore")  # cap 2 MB
+        else:
+            path = os.path.expanduser(skill_url)
+            exts = (".md", ".py", ".js", ".ts", ".sh", ".json", ".rb", ".php", ".pl")
+            if os.path.isdir(path):
+                for root, _, files in os.walk(path):
+                    for fn in files:
+                        if fn.endswith(exts):
+                            try:
+                                with open(os.path.join(root, fn), errors="ignore") as fh:
+                                    content += fh.read() + "\n"
+                            except OSError:
+                                pass
+            elif os.path.isfile(path):
+                with open(path, errors="ignore") as fh:
+                    content = fh.read()
+            else:
+                return {"skill": skill_url, "status": "error", "error": "skill not found"}
+    except Exception as e:  # network / decode errors
+        return {"skill": skill_url, "status": "error", "error": str(e)}
+
+    findings = patterns.scan_text(content)
+    sevs = {f["severity"] for f in findings}
+    verdict = ("DANGEROUS" if "critical" in sevs
+               else "SUSPICIOUS" if "high" in sevs
+               else "REVIEW" if findings
+               else "CLEAN")
+    return {
+        "skill": skill_url,
+        "status": "ok",
+        "patterns_checked": patterns.count(),
+        "verdict": verdict,
+        "findings": findings,
+    }
 
 def generate_report(results: Dict[str, Any], format: str = "text") -> str:
     if format == "json":

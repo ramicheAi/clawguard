@@ -6,7 +6,7 @@ ClawGuard CLI - Command line interface
 import click
 import sys
 from pathlib import Path
-from .scanner import scan_openclaw, monitor_openclaw, audit_skill, generate_report
+from .scanner import scan_openclaw, monitor_openclaw, generate_report
 
 @click.group()
 @click.version_option(version="1.0.0")
@@ -63,13 +63,33 @@ def monitor(daemon, interval):
 
 @cli.command()
 @click.argument('skill_url')
-def audit_skill(skill_url):
-    """Audit a ClawHub skill for security issues"""
+@click.option('--output', type=click.Choice(['text', 'json']), default='text', help='Output format')
+def audit_skill(skill_url, output):
+    """Audit a ClawHub skill (URL or local path) for malicious patterns"""
+    from . import scanner
     click.echo(f"🔍 Auditing skill: {skill_url}")
-    # TODO: Implement skill auditing
-    click.echo("Skill auditing feature coming soon!")
-    click.echo("Subscribe to ClawGuard Pro for early access.")
-    sys.exit(0)
+    result = scanner.audit_skill(skill_url)
+
+    if output == 'json':
+        import json
+        click.echo(json.dumps(result, indent=2))
+        sys.exit(0 if result.get('verdict') in ('CLEAN', 'REVIEW') else 2)
+
+    if result.get('status') != 'ok':
+        click.echo(f"Error: {result.get('error', 'unknown')}", err=True)
+        sys.exit(1)
+
+    verdict = result['verdict']
+    color = {'CLEAN': 'green', 'REVIEW': 'yellow', 'SUSPICIOUS': 'red', 'DANGEROUS': 'red'}.get(verdict, 'white')
+    click.echo(f"Checked against {result['patterns_checked']} patterns")
+    click.echo(f"Verdict: {click.style(verdict, fg=color, bold=True)}")
+    findings = result.get('findings', [])
+    if findings:
+        for f in findings:
+            click.echo(f"  ✗ [{f['severity'].upper()}] {f['category']}: {f['description']}  ({f['match']})")
+    else:
+        click.echo("  ✓ No malicious patterns detected.")
+    sys.exit(0 if verdict in ('CLEAN', 'REVIEW') else 2)
 
 @cli.command()
 @click.option('--path', default='~/.openclaw', help='OpenClaw installation path')
@@ -145,6 +165,58 @@ def compliance(path, frameworks, output):
                 click.echo(f"    {ctrl['detail']}")
 
     sys.exit(0)
+
+@cli.command()
+@click.option('--policy', type=click.Choice(['standard', 'strict']), default='standard', help='Sandbox strictness')
+@click.option('--workdir', default='.', help='Directory the sandboxed process may write to')
+@click.option('--allow-network', is_flag=True, help='Permit network access (default: blocked)')
+@click.option('--no-exec', is_flag=True, help='(strict) deny spawning new programs')
+@click.option('--show-profile', is_flag=True, help='Print the generated Seatbelt profile and exit')
+@click.argument('command', nargs=-1)
+def sandbox(policy, workdir, allow_network, no_exec, show_profile, command):
+    """Run a command under a macOS Seatbelt sandbox (no command = self-test)."""
+    from . import sandbox as sb
+    if not sb.is_available():
+        click.echo("Error: Seatbelt sandboxing requires macOS with /usr/bin/sandbox-exec.", err=True)
+        sys.exit(1)
+
+    wd = str(Path(workdir).expanduser())
+
+    if show_profile:
+        click.echo(sb.build_profile(policy, wd, allow_network, not no_exec))
+        sys.exit(0)
+
+    if not command:
+        click.echo("🛡️  ClawGuard Seatbelt self-test")
+        res = sb.check()
+        for name, ok in res.get("checks", {}).items():
+            click.echo(f"  {'✓' if ok else '✗'} {name.replace('_', ' ')}")
+        passed = res.get("passed", False)
+        click.echo("✅ Sandbox enforces isolation." if passed else "❌ Sandbox NOT enforcing — investigate.")
+        sys.exit(0 if passed else 1)
+
+    res = sb.run(list(command), policy=policy, workdir=wd,
+                 allow_network=allow_network, allow_exec=not no_exec)
+    if res.stdout:
+        click.echo(res.stdout, nl=False)
+    if res.stderr:
+        click.echo(res.stderr, nl=False, err=True)
+    sys.exit(res.returncode)
+
+
+@cli.command()
+@click.option('--output', type=click.Choice(['text', 'json']), default='text', help='Output format')
+def patterns(output):
+    """Show the malicious-pattern corpus (count + categories)."""
+    from . import patterns as P
+    if output == 'json':
+        import json
+        click.echo(json.dumps({"count": P.count(), "categories": P.categories()}, indent=2))
+        return
+    click.echo(f"🛡️  ClawGuard malicious-pattern corpus: {click.style(str(P.count()), bold=True)} signatures")
+    for cat, n in P.categories().items():
+        click.echo(f"  {n:>4}  {cat}")
+
 
 def main():
     cli()
